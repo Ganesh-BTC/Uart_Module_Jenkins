@@ -50,8 +50,22 @@ pipeline {
                 echo '=== Save Artifacts ==='
                 sh '''
                     mkdir -p artifacts
-                    cp UART5_Debug/firmware/build/UART_Module.elf artifacts/ 2>/dev/null || echo "⚠️ ELF not found"
-                    cp UART5_Debug/firmware/build/UART_Module.hex artifacts/ 2>/dev/null || echo "⚠️ HEX not found"
+                    
+                    # Copy ELF file (CMake generates without .elf extension)
+                    if [ -f "UART5_Debug/firmware/build/UART_Module" ]; then
+                        cp UART5_Debug/firmware/build/UART_Module artifacts/UART_Module.elf
+                        echo "✅ ELF file saved to artifacts"
+                    else
+                        echo "⚠️ ELF not found"
+                    fi
+                    
+                    # Copy HEX file
+                    if [ -f "UART5_Debug/firmware/build/UART_Module.hex" ]; then
+                        cp UART5_Debug/firmware/build/UART_Module.hex artifacts/
+                        echo "✅ HEX file saved to artifacts"
+                    else
+                        echo "⚠️ HEX not found"
+                    fi
                     
                     # Create Jenkins build log
                     cat > artifacts/jenkins_build.log << EOL
