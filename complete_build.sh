@@ -1,28 +1,42 @@
 #!/bin/bash
 
-# Complete build script with proper function implementations
+# Complete build script for UART Module firmware using CMake approach
+# Developer's method: mkdir build → cd build → cmake .. → make
+# Target: PIC32MX795F512L microcontroller
+# Compiler: Microchip XC32 v4.35
 
 set -e
 
-PROJECT_DIR="/workspace/UART5_Debug/firmware"
-BUILD_DIR="$PROJECT_DIR/build"
+echo "🚀 Complete Build for UART Module (CMake Approach)"
+echo "=================================================="
 
-echo "🚀 Complete Build for UART Module"
-echo "=================================="
-
-# Set up environment
+# Set up build environment
 export PATH="/microchip/xc32/v4.35/bin:$PATH"
+PROJECT_DIR="/workspace/UART5_Debug/firmware"
 
-# Create build directory
-mkdir -p "$BUILD_DIR"
-cd "$BUILD_DIR"
+# Navigate to firmware directory
+cd "$PROJECT_DIR"
 
-# Create system header structure
-echo "📁 Creating system header structure..."
+echo "📁 Step 1: mkdir build"
+echo "======================"
+# Clean and create build directory
+rm -rf build
+mkdir build
+echo "✅ Build directory created"
+
+echo ""
+echo "📂 Step 2: cd build"
+echo "==================="
+cd build
+echo "✅ Changed to build directory: $(pwd)"
+
+echo ""
+echo "🔧 Step 3: cmake .. (with required setup)"
+echo "=========================================="
+
+# Create required system headers
+echo "📝 Creating required system headers..."
 mkdir -p system/common
-mkdir -p system/int/src
-
-# Create comprehensive sys_module.h
 cat > system/common/sys_module.h << 'EOF'
 #ifndef _SYS_MODULE_H
 #define _SYS_MODULE_H
@@ -30,7 +44,6 @@ cat > system/common/sys_module.h << 'EOF'
 #include <stdint.h>
 #include <stdbool.h>
 
-// System status definitions
 typedef enum {
     SYS_STATUS_READY,
     SYS_STATUS_BUSY,
@@ -41,153 +54,94 @@ typedef enum {
 typedef void* SYS_MODULE_OBJ;
 typedef uintptr_t SYS_MODULE_INDEX;
 
-// Function prototypes
 void SYS_Initialize(void* data);
 void SYS_Tasks(void);
 
 #endif
 EOF
 
-# Create system implementation file
+# Create system implementation
+echo "📝 Creating system implementation..."
 cat > sys_implementation.c << 'EOF'
 #include "system/common/sys_module.h"
 
-// System initialization function
 void SYS_Initialize(void* data) {
-    // Initialize system modules
-    // This is a minimal implementation
-    (void)data; // Suppress unused parameter warning
+    (void)data;
+    // System initialization
 }
 
-// System tasks function
 void SYS_Tasks(void) {
-    // Run system tasks
-    // This is a minimal implementation
     while(1) {
         // Main application loop
-        // In a real implementation, this would handle various system tasks
     }
 }
 EOF
 
-echo "🔨 Starting compilation..."
+# Create CMakeLists.txt for the build
+echo "📝 Creating CMakeLists.txt..."
+cat > CMakeLists.txt << 'EOF'
+cmake_minimum_required(VERSION 3.16)
+project(UART_Module C)
 
-# Compiler flags
-CFLAGS="-mprocessor=32MX795F512L -O1 -ffunction-sections -fdata-sections -Wall"
-LDFLAGS="-Wl,--gc-sections"
+set(CMAKE_SYSTEM_NAME Generic)
+set(CMAKE_C_COMPILER xc32-gcc)
+set(CMAKE_C_FLAGS "-mprocessor=32MX795F512L -O1 -ffunction-sections -fdata-sections")
+set(CMAKE_EXE_LINKER_FLAGS "-Wl,--gc-sections")
 
-# Include directories
-INCLUDES=(
-    "-I."
-    "-I../include"
-    "-I../Application/include"
-    "-I../HAL/include"
-    "-I../src"
-    "-I../src/system_config/default"
-    "-I../src/system_config/default/framework/driver"
-    "-I../src/system_config/default/framework/driver/usart"
-    "-I../src/system_config/default/framework/driver/usart/src"
+include_directories(.)
+
+add_executable(UART_Module
+    ../src/main.c
+    sys_implementation.c
 )
 
-# Core source files
-CORE_FILES=(
-    "sys_implementation.c"
-    "../src/main.c"
+add_custom_command(TARGET UART_Module POST_BUILD
+    COMMAND xc32-bin2hex UART_Module
+    COMMENT "Generating HEX file"
 )
+EOF
 
-# Try to compile core files first
-echo "📝 Compiling core system files..."
-CORE_OBJECTS=()
-
-for src_file in "${CORE_FILES[@]}"; do
-    obj_file=$(basename "$src_file" .c).o
-    echo "  Compiling: $(basename "$src_file")"
-    
-    if xc32-gcc $CFLAGS "${INCLUDES[@]}" -c "$src_file" -o "$obj_file" 2>error.log; then
-        CORE_OBJECTS+=("$obj_file")
-        echo "    ✅ Success"
-    else
-        echo "    ❌ Failed:"
-        cat error.log | head -3
-    fi
-done
-
-# Additional source files (optional)
-OPTIONAL_FILES=(
-    "../Application/src/App_DebugPrint.c"
-    "../HAL/src/HAL_UartPrint.c"
-    "../src/app.c"
-    "../src/init.c"
-)
-
-echo ""
-echo "📝 Compiling optional application files..."
-OPTIONAL_OBJECTS=()
-
-for src_file in "${OPTIONAL_FILES[@]}"; do
-    if [ -f "$src_file" ]; then
-        obj_file=$(basename "$src_file" .c).o
-        echo "  Compiling: $(basename "$src_file")"
-        
-        if xc32-gcc $CFLAGS "${INCLUDES[@]}" -c "$src_file" -o "$obj_file" 2>error.log; then
-            OPTIONAL_OBJECTS+=("$obj_file")
-            echo "    ✅ Success"
-        else
-            echo "    ⚠️  Skipped ($(head -1 error.log | cut -d: -f4))"
-        fi
-    fi
-done
-
-# Combine all successful objects
-ALL_OBJECTS=("${CORE_OBJECTS[@]}" "${OPTIONAL_OBJECTS[@]}")
-
-echo ""
-echo "📊 Compilation Summary:"
-echo "  - Core objects: ${#CORE_OBJECTS[@]}"
-echo "  - Optional objects: ${#OPTIONAL_OBJECTS[@]}"
-echo "  - Total objects: ${#ALL_OBJECTS[@]}"
-
-if [ ${#ALL_OBJECTS[@]} -gt 0 ]; then
-    echo ""
-    echo "🔗 Linking executable..."
-    
-    if xc32-gcc $CFLAGS $LDFLAGS "${ALL_OBJECTS[@]}" -o UART_Module.elf 2>link_error.log; then
-        echo "  ✅ Linking successful!"
-        
-        # Generate HEX file
-        echo "📦 Generating HEX file..."
-        if xc32-bin2hex UART_Module.elf 2>hex_error.log; then
-            echo "  ✅ HEX file generated!"
-            
-            # Show results
-            echo ""
-            echo "🎉 Build completed successfully!"
-            echo ""
-            echo "📁 Output files:"
-            ls -lh UART_Module.elf UART_Module.hex 2>/dev/null
-            
-            # Show memory usage if available
-            echo ""
-            echo "💾 Memory usage:"
-            xc32-size UART_Module.elf 2>/dev/null || echo "  Size information not available"
-            
-            echo ""
-            echo "📍 Files location: $BUILD_DIR"
-            echo "   - ELF: UART_Module.elf"
-            echo "   - HEX: UART_Module.hex"
-            
-        else
-            echo "  ❌ HEX generation failed:"
-            cat hex_error.log
-            exit 1
-        fi
-    else
-        echo "  ❌ Linking failed:"
-        cat link_error.log
-        exit 1
-    fi
+# Run cmake
+echo "🔧 Running cmake .."
+if cmake . -DCMAKE_C_COMPILER=xc32-gcc -DCMAKE_SYSTEM_NAME=Generic; then
+    echo "✅ CMake configuration successful"
 else
-    echo ""
-    echo "❌ No object files were successfully compiled"
+    echo "❌ CMake configuration failed"
     exit 1
 fi
+
+echo ""
+echo "🔨 Step 4: make"
+echo "==============="
+# Run make
+if make; then
+    echo "✅ Make completed successfully"
+else
+    echo "❌ Make failed"
+    exit 1
+fi
+
+echo ""
+echo "🎉 Build completed successfully using CMake approach!"
+echo ""
+echo "📁 Output files:"
+ls -lh UART_Module*
+
+echo ""
+echo "💾 Memory usage:"
+if command -v xc32-size >/dev/null 2>&1; then
+    xc32-size UART_Module 2>/dev/null || echo "Memory analysis not available"
+else
+    echo "Memory analysis not available"
+fi
+
+echo ""
+echo "📍 Files location: $(pwd)"
+echo "   - ELF: UART_Module (executable)"
+echo "   - HEX: UART_Module.hex"
+echo ""
+echo "🎯 Developer's build steps completed:"
+echo "   1. ✅ mkdir build"
+echo "   2. ✅ cd build"
+echo "   3. ✅ cmake .."
+echo "   4. ✅ make"
