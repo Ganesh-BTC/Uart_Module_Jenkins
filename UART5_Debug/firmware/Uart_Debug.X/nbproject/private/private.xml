@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project-private xmlns="http://www.netbeans.org/ns/project-private/1">
+    <editor-bookmarks xmlns="http://www.netbeans.org/ns/editor-bookmarks/2" lastBookmarkId="0"/>
+    <open-files xmlns="http://www.netbeans.org/ns/projectui-open-files/2">
+        <group>
+            <file>file:/C:/Work/UART_Module/UART5_Debug/firmware/include/Uart_Module_Version.h</file>
+            <file>file:/C:/Work/UART_Module/UART5_Debug/firmware/HAL/src/HAL_UartPrint.c</file>
+            <file>file:/C:/Work/UART_Module/UART5_Debug/firmware/Application/include/App_Uart_Include.h</file>
+            <file>file:/C:/Work/UART_Module/UART5_Debug/firmware/src/app.h</file>
+            <file>file:/C:/Work/UART_Module/UART5_Debug/firmware/src/app.c</file>
+            <file>file:/C:/Work/UART_Module/UART5_Debug/firmware/src/main.c</file>
+            <file>file:/C:/Work/UART_Module/UART5_Debug/firmware/Uart_Debug.X/nbproject/Makefile-default.mk</file>
+            <file>file:/C:/Work/UART_Module/UART5_Debug/firmware/Application/include/App_DebugPrint.h</file>
+            <file>file:/C:/Work/UART_Module/UART5_Debug/firmware/src/init.c</file>
+        </group>
+    </open-files>
+</project-private>

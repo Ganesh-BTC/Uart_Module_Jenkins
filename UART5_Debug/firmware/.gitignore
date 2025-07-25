@@ -1,0 +1,12 @@
+# Ignore generated and build artifacts for UART_MODULE
+Uart_Debug.X/.generated_files/
+Uart_Debug.X/build/
+Uart_Debug.X/dist/
+Uart_Debug.X/build/default/production/_ext/
+Uart_Debug.X/dist/default/production/
+
+# Ignore NetBeans private configurations
+Uart_Debug.X/nbproject/private/configurations.xml
+
+# Ignore build scripts and platform-specific makefiles
+*.bash
