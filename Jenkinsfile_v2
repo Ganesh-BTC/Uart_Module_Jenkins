@@ -1,0 +1,131 @@
+pipeline {
+    agent any
+
+    environment {
+        DOCKER_IMAGE = 'free_rtos_v1:latest'
+        BUILD_PATH = 'UART5_Debug/firmware/build'
+    }
+
+    options {
+        timeout(time: 30, unit: 'MINUTES')
+        timestamps()
+    }
+
+    stages {
+        stage('Git Code Checkout') {
+            steps {
+                echo '=== Git Code Checkout ==='
+                cleanWs()
+                checkout([
+                    $class: 'GitSCM',
+                    branches: [[name: '*/main']],
+                    userRemoteConfigs: [[url: 'https://github.com/Ganesh-BTC/Uart_Module_Jenkins.git']]
+                ])
+                echo '✅ Code checked out successfully'
+            }
+        }
+
+        stage('Build Code') {
+            steps {
+                echo '=== Build Code ==='
+                sh '''#!/bin/bash
+                    set -e
+
+                    # Verify Docker image
+                    docker images | grep -q free_rtos_v1 || { echo "❌ Docker image not found"; exit 1; }
+
+                    docker run --rm --privileged \\
+                        -u $(id -u):$(id -g) \\
+                        -v $(pwd):/workspace \\
+                        -w /workspace/UART5_Debug/firmware \\
+                        -e PATH="/microchip/xc32/v4.35/bin:$PATH" \\
+                        ${DOCKER_IMAGE} bash -c "
+                            set -e
+                            rm -rf build && mkdir build && cd build
+
+                            mkdir -p system/common
+                            cat <<EOF > system/common/sys_module.h
+#ifndef _SYS_MODULE_H
+#define _SYS_MODULE_H
+#include <stdint.h>
+#include <stdbool.h>
+typedef enum { SYS_STATUS_READY, SYS_STATUS_BUSY, SYS_STATUS_ERROR, SYS_STATUS_UNINITIALIZED } SYS_STATUS;
+typedef void* SYS_MODULE_OBJ;
+typedef uintptr_t SYS_MODULE_INDEX;
+void SYS_Initialize(void* data);
+void SYS_Tasks(void);
+#endif
+EOF
+
+                            cat <<EOF > sys_implementation.c
+#include \\"system/common/sys_module.h\\"
+void SYS_Initialize(void* data) { (void)data; }
+void SYS_Tasks(void) { while(1) { } }
+EOF
+
+                            cat <<EOF > CMakeLists.txt
+cmake_minimum_required(VERSION 3.16)
+project(UART_Module C)
+set(CMAKE_SYSTEM_NAME Generic)
+set(CMAKE_C_COMPILER xc32-gcc)
+set(CMAKE_C_FLAGS \\"-mprocessor=32MX795F512L -O1 -ffunction-sections -fdata-sections\\")
+set(CMAKE_EXE_LINKER_FLAGS \\"-Wl,--gc-sections\\")
+include_directories(.)
+add_executable(UART_Module ../src/main.c sys_implementation.c)
+add_custom_command(TARGET UART_Module POST_BUILD COMMAND xc32-bin2hex UART_Module COMMENT \\"Generating HEX file\\")
+EOF
+
+                            cmake . -DCMAKE_C_COMPILER=xc32-gcc -DCMAKE_SYSTEM_NAME=Generic
+                            make
+
+                            ls -lh UART_Module*
+                        "
+                '''
+                echo '✅ Build completed'
+            }
+        }
+
+        stage('Save Artifacts') {
+            steps {
+                echo '=== Save Artifacts ==='
+                sh '''#!/bin/bash
+                    set -e
+                    mkdir -p artifacts
+
+                    # Copy build outputs
+                    [ -f "${BUILD_PATH}/UART_Module" ] && cp "${BUILD_PATH}/UART_Module" artifacts/UART_Module.elf
+                    [ -f "${BUILD_PATH}/UART_Module.hex" ] && cp "${BUILD_PATH}/UART_Module.hex" artifacts/
+
+                    # Create build log
+                    cat > artifacts/jenkins_build.log <<EOL
+=== Jenkins Build Log ===
+Build: ${BUILD_NUMBER} | Date: $(date)
+Repository: https://github.com/Ganesh-BTC/Uart_Module_Jenkins.git
+Commit: ${GIT_COMMIT}
+Job: ${JOB_NAME} | URL: ${BUILD_URL}
+Status: SUCCESS
+EOL
+
+                    # Add file sizes
+                    [ -f "artifacts/UART_Module.elf" ] && echo "ELF: $(stat -c%s artifacts/UART_Module.elf) bytes" >> artifacts/jenkins_build.log
+                    [ -f "artifacts/UART_Module.hex" ] && echo "HEX: $(stat -c%s artifacts/UART_Module.hex) bytes" >> artifacts/jenkins_build.log
+                '''
+
+                archiveArtifacts artifacts: 'artifacts/*', allowEmptyArchive: true
+                echo '✅ Artifacts saved'
+            }
+        }
+    }
+
+    post {
+        always {
+            sh 'docker container prune -f || true'
+        }
+        success {
+            echo '🎉 Pipeline completed successfully!'
+        }
+        failure {
+            echo '❌ Pipeline failed!'
+        }
+    }
+}
